@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Fee Management & Student DB - Unique Science Academy</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* --- CSS Variables for Theming --- */
+        :root {
+            --bg-color: #f0f2f5;
+            --panel-bg-color: #ffffff;
+            --text-color: #333;
+            --primary-color: #1e3a8a;
+            --primary-color-hover: #1c327a;
+            --secondary-color: #16a34a;
+            --secondary-color-hover: #15803d;
+            --accent-color: #d97706;
+            --accent-color-hover: #b45309;
+            --border-color: #ccc;
+            --light-border-color: #e0e0e0;
+            --table-header-bg: #eef2ff;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --error-color: #ef4444;
+            --modal-overlay-color: rgba(0, 0, 0, 0.6);
+            --note-list-hover-bg: #eef2ff;
+            --present-bg: #dcfce7; /* Light Green for Present */
+            --absent-bg: #fee2e2;  /* Light Red for Absent */
+            --leave-bg: #fef9c3;   /* Light Yellow for Leave */
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --panel-bg-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --primary-color: #3b82f6;
+            --primary-color-hover: #2563eb;
+            --secondary-color: #22c55e;
+            --secondary-color-hover: #16a34a;
+            --accent-color: #f59e0b;
+            --accent-color-hover: #d97706;
+            --border-color: #555;
+            --light-border-color: #444;
+            --table-header-bg: #2a304e;
+            --shadow-color: rgba(0, 0, 0, 0.4);
+            --modal-overlay-color: rgba(0, 0, 0, 0.7);
+            --note-list-hover-bg: #2a304e;
+            --present-bg: #166534;
+            --absent-bg: #991b1b;
+            --leave-bg: #854d0e;
+        }
+
+        /* --- GENERAL & LOCK SCREEN STYLING --- */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; height: 100vh; overflow: hidden; }
+        #lock-screen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--modal-overlay-color); backdrop-filter: blur(8px); z-index: 2000; display: flex; align-items: center; justify-content: center; opacity: 1; transition: opacity 0.5s ease-in-out; }
+        .lock-box { background-color: var(--panel-bg-color); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px var(--shadow-color); width: 350px; text-align: center; overflow: hidden; }
+        .lock-box .panel { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .lock-box .panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .lock-box h2 { color: var(--primary-color); margin-bottom: 25px; }
+        .lock-box .welcome-message { font-size: 24px; font-weight: bold; color: var(--secondary-color); animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
+        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .lock-box input { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box; margin-bottom: 15px; background-color: var(--bg-color); color: var(--text-color); font-size: 16px; }
+        .lock-box .error-message { color: var(--error-color); font-size: 14px; height: 20px; margin-bottom: 10px; }
+        .lock-box .button-group { display: flex; gap: 10px; justify-content: center; }
+
+        /* --- MAIN APP LAYOUT & TABS --- */
+        #main-app-container { display: none; flex-direction: column; height: 100vh; }
+        .app-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: var(--panel-bg-color); border-bottom: 1px solid var(--light-border-color); box-shadow: 0 2px 5px var(--shadow-color); z-index: 10; }
+        
+        .logo-title-container { display: flex; align-items: center; gap: 15px; }
+        .header-logo { height: 50px; width: auto; }
+        
+        .app-header h1 { font-size: 22px; color: var(--primary-color); margin: 0; }
+        .app-tabs { display: flex; flex-wrap: wrap; }
+        .tab-link { padding: 15px 25px; cursor: pointer; font-size: 16px; font-weight: 600; color: var(--text-color); border: none; background: none; border-bottom: 3px solid transparent; transition: all 0.3s; margin-top: 3px; }
+        .tab-link.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+
+        .app-content { flex-grow: 1; overflow: auto; padding: 20px; }
+        .tab-content { display: none; height: 100%; box-sizing: border-box; }
+        .tab-content.active { display: flex; animation: fadeIn 0.5s; }
+
+        /* General Button Styling */
+        button { padding: 12px 20px; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        button:active { transform: scale(0.98) translateY(0); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-primary:hover { background-color: var(--primary-color-hover); }
+        .btn-secondary { background-color: var(--secondary-color); color: white; }
+        .btn-secondary:hover { background-color: var(--secondary-color-hover); }
+        .btn-accent { background-color: var(--accent-color); color: white; }
+        .btn-accent:hover { background-color: var(--accent-color-hover); }
+        .btn-neutral { background-color: #6c757d; color: white; }
+        .btn-neutral:hover { background-color: #5a6268; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-danger:hover { background-color: #c82333; }
+        .btn-small { padding: 5px 10px; font-size: 14px; }
+        .btn-icon { background: none; border: none; box-shadow: none; padding: 5px; font-size: 18px; color: var(--text-color); opacity: 0.6; }
+        .btn-icon:hover { opacity: 1; color: var(--primary-color); transform: none; }
+        
+        /* General Input Styling */
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--text-color); }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; background-color: var(--bg-color); color: var(--text-color); }
+        .input-group textarea { min-height: 120px; resize: vertical; }
+        .input-group input.mandatory-error { border-color: var(--error-color); }
+        .validation-error { color: var(--error-color); font-weight: bold; text-align: center; margin-bottom: 15px; display: none; }
+
+        /* --- VOUCHER & NOTICE GENERATOR COMMON STYLES --- */
+        #voucher-generator-tab-content, #notice-generator-tab-content { gap: 20px; justify-content: center; width: 100%; }
+        .controls { width: 380px; flex-shrink: 0; padding: 20px; background-color: var(--panel-bg-color); border-radius: 8px; box-shadow: 0 4px 12px var(--shadow-color); height: fit-content; transition: background-color 0.3s; }
+        .controls h2 { text-align: center; color: var(--primary-color); margin-top: 0; border-bottom: 2px solid var(--light-border-color); padding-bottom: 10px; }
+        .actions { margin-top: 25px; display: flex; flex-direction: column; gap: 10px; }
+        
+        .preview-wrapper { width: 21cm; min-height: 29.7cm; padding: 1.5cm; background-color: var(--panel-bg-color); box-shadow: 0 4px 12px var(--shadow-color); box-sizing: border-box; transition: background-color 0.3s; }
+        .preview-container { border: 2px solid var(--text-color); padding: 20px; background-color: white; }
+        .preview-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 15px; }
+        .preview-header img { width: 100px; height: 100px; }
+        .academy-info h1 { margin: 0; color: #1e3a8a; font-size: 28px; }
+        .academy-info p, .preview-container p { color: #333; }
+        .academy-info p { margin: 5px 0 0; font-size: 14px; color: #555; }
+        .dev-credit { text-align: right; font-style: italic; font-size: 12px; }
+        .dev-credit p { margin: 0; }
+
+        /* --- VOUCHER PREVIEW STYLING --- */
+        .voucher-title { text-align: center; margin: 20px 0; font-size: 22px; font-weight: bold; color: #333; }
+        .voucher-details { display: flex; justify-content: space-between; margin-bottom: 20px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; }
+        .detail-item p { margin: 5px 0; font-size: 14px; }
+        .detail-item span { font-weight: bold; }
+        .fees-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .fees-table th, .fees-table td { border: 1px solid #ccc; padding: 12px; font-size: 14px; color: #333; }
+        .fees-table th { background-color: #eef2ff; text-align: left; font-weight: 600; color: #1e3a8a; }
+        .fees-table .description-col { width: 70%; }
+        .fees-table .amount-col { width: 30%; text-align: right; }
+        .fees-table tr.total-row td { font-weight: bold; font-size: 16px; background-color: #eef2ff; }
+        .voucher-footer { margin-top: 30px; padding-top: 15px; border-top: 1px dashed #999; font-size: 12px; color: #555; display: flex; justify-content: space-between; align-items: flex-end; }
+        .footer-notes p { margin: 0 0 5px; }
+        
+        /* --- NOTICE GENERATOR STYLING --- */
+        #notice-preview-container { display: flex; flex-direction: column; min-height: 25cm; }
+        .notice-header-info { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 25px; }
+        .notice-header-info p { margin: 0; font-size: 14px; color: #333; font-weight: 600; }
+        #notice-heading-preview { text-align: center; margin: 30px 0; font-size: 24px; font-weight: bold; text-decoration: underline; color: #1e3a8a; }
+        #notice-body-preview { margin: 20px 0; font-size: 16px; line-height: 1.6; color: #333; white-space: pre-wrap; flex-grow: 1; }
+        #notice-regards-preview { margin-top: 40px; font-size: 16px; font-weight: bold; color: #333; }
+        
+        /* --- DATABASE & ATTENDANCE COMMON STYLES --- */
+        #student-database-tab-content, #attendance-tab-content { flex-direction: column; width: 100%; }
+        .db-panel { background-color: var(--panel-bg-color); padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px var(--shadow-color); }
+        .db-controls, .attendance-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 20px; }
+        .db-controls .search-bar, .attendance-controls .search-bar { width: 40%; }
+        .student-table-container, .attendance-table-container { overflow-x: auto; }
+        .student-table, .attendance-table { width: 100%; border-collapse: collapse; }
+        .student-table th, .student-table td, .attendance-table th, .attendance-table td { border: 1px solid var(--light-border-color); padding: 12px 15px; text-align: left; vertical-align: middle; }
+        .student-table thead th, .attendance-table thead th { background-color: var(--table-header-bg); color: var(--primary-color); font-weight: 600; position: sticky; top: 0; }
+        .student-table tbody tr:nth-child(even), .attendance-table tbody tr:nth-child(even) { background-color: var(--bg-color); }
+        .student-table tbody tr:hover, .attendance-table tbody tr:hover { background-color: var(--table-header-bg); }
+        .actions-col { text-align: center; }
+        .actions-col button { margin: 0 5px; }
+
+        /* --- ATTENDANCE TAB SPECIFIC STYLES --- */
+        .attendance-status-group { display: flex; gap: 5px; }
+        .attendance-status-group input[type="radio"] { display: none; }
+        .attendance-status-group label { padding: 8px 12px; border-radius: 5px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s; font-size: 14px; user-select: none; }
+        .attendance-status-group input[type="radio"]:checked + label { color: white; border-color: transparent; }
+        .attendance-status-group input[id*="-P"]:checked + label { background-color: var(--secondary-color); }
+        .attendance-status-group input[id*="-A"]:checked + label { background-color: var(--error-color); }
+        .attendance-status-group input[id*="-L"]:checked + label { background-color: var(--accent-color); }
+        #save-attendance-status { margin-left: 15px; color: var(--secondary-color); font-weight: bold; opacity: 0; transition: opacity 0.5s; }
+
+        /* --- NOTES TAB STYLING --- */
+        #notes-tab-content { width: 100%; height: 100%; padding: 0 !important; }
+        .notes-app-container { display: flex; height: 100%; width: 100%; background-color: var(--panel-bg-color); box-shadow: 0 4px 12px var(--shadow-color); border-radius: 8px; overflow: hidden; }
+        .notes-sidebar { width: 300px; background-color: var(--bg-color); border-right: 1px solid var(--light-border-color); display: flex; flex-direction: column; }
+        .notes-sidebar-header { padding: 15px; border-bottom: 1px solid var(--light-border-color); }
+        #new-note-btn { width: 100%; }
+        #notes-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        .note-list-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--light-border-color); display: flex; justify-content: space-between; align-items: center; transition: background-color 0.2s; }
+        .note-list-item:hover { background-color: var(--note-list-hover-bg); }
+        .note-list-item.active { background-color: var(--primary-color); color: white; }
+        .note-list-item.active .note-list-actions button { color: white; opacity: 0.8; }
+        .note-list-item.active .note-list-actions button:hover { opacity: 1; }
+        .note-list-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .note-list-actions { display: flex; gap: 5px; }
+        .notes-editor { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; }
+        #editor-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: #888; }
+        #editor-placeholder .placeholder-icon { font-size: 60px; margin-bottom: 20px; }
+        #editor-main { display: none; flex-direction: column; height: 100%; }
+        #note-title-input { font-size: 24px; font-weight: bold; border: none; padding: 10px 0; margin-bottom: 15px; background: transparent; border-bottom: 2px solid var(--light-border-color); }
+        #note-content-editor { flex-grow: 1; display: flex; flex-direction: column; }
+        #note-content-editor textarea { width: 100%; height: 100%; border: 1px solid var(--border-color); border-radius: 5px; padding: 15px; font-size: 16px; resize: none; background-color: var(--bg-color); color: var(--text-color); }
+        .editor-actions { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        #save-note-status { color: var(--secondary-color); font-weight: bold; opacity: 0; transition: opacity 0.5s; }
+
+        /* --- MODAL STYLING (STUDENT & ATTENDANCE) --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--modal-overlay-color); backdrop-filter: blur(5px); z-index: 1000; display: none; align-items: center; justify-content: center; animation: fadeIn 0.3s; }
+        .modal-content { background-color: var(--panel-bg-color); padding: 30px; border-radius: 8px; box-shadow: 0 5px 20px var(--shadow-color); width: 90%; max-width: 700px; animation: popIn 0.3s ease-out; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--light-border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; color: var(--primary-color); }
+        .modal-header .close-btn { font-size: 24px; cursor: pointer; color: var(--text-color); border: none; background: none; }
+        #student-modal .modal-body .input-group { display: grid; grid-template-columns: 1fr 2fr; align-items: center; gap: 15px; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; border-top: 1px solid var(--light-border-color); padding-top: 15px; }
+
+        /* --- ATTENDANCE CALENDAR MODAL STYLING --- */
+        #attendance-detail-modal .modal-body { display: flex; gap: 20px; }
+        #attendance-summary { width: 200px; flex-shrink: 0; }
+        #attendance-summary h4 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+        #attendance-summary p { margin: 5px 0; font-size: 14px; }
+        #attendance-summary span { font-weight: bold; }
+        #calendar-container { flex-grow: 1; }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .calendar-header h3 { margin: 0; color: var(--primary-color); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .calendar-day, .day-header { width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; }
+        .day-header { font-size: 12px; color: var(--accent-color); }
+        .calendar-day { font-size: 14px; border: 1px solid transparent; }
+        .calendar-day.other-month { color: var(--border-color); }
+        .calendar-day.today { border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color); }
+        .calendar-day.present { background-color: var(--present-bg); }
+        .calendar-day.absent { background-color: var(--absent-bg); }
+        .calendar-day.leave { background-color: var(--leave-bg); }
+        body.dark-mode .calendar-day.present, body.dark-mode .calendar-day.absent, body.dark-mode .calendar-day.leave { color: white; }
+
+        /* --- THEME TOGGLE --- */
+        .theme-switcher { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--light-border-color); }
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(24px); }
+        
+        /* --- MOBILE DISCLAIMER --- */
+        #mobile-disclaimer { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-color); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; box-sizing: border-box; }
+        #mobile-disclaimer img { max-width: 80%; max-height: 50vh; margin-bottom: 20px; }
+        #mobile-disclaimer p { font-size: 1.2em; font-weight: bold; color: var(--text-color); }
+        
+        /* --- MEDIA QUERIES --- */
+        @media print {
+            body { background-color: #fff; padding: 0; margin: 0; }
+            .controls, #lock-screen-overlay, .app-header, #student-database-tab-content, #notes-tab-content, #attendance-tab-content, #theme-switcher, .actions button:not(.print-this), #mobile-disclaimer { display: none; }
+            .app-content { padding: 0; overflow: visible; }
+            body.printing-voucher #notice-generator-tab-content { display: none; }
+            body.printing-notice #voucher-generator-tab-content { display: none; }
+            .preview-wrapper { width: 100%; min-height: 0; box-shadow: none; padding: 0; margin: 0; }
+            .preview-container { border: 2px solid #000; page-break-after: always; }
+        }
+
+        @media (max-width: 768px) {
+            #lock-screen-overlay, #main-app-container { display: none !important; }
+            #mobile-disclaimer { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MOBILE DISCLAIMER -->
+    <div id="mobile-disclaimer">
+        <img src="disclaimer.png" alt="Desktop Only" onerror="this.style.display='none'">
+        <p>This application is designed for desktop use only.</p>
+    </div>
+
+    <!-- LOCK SCREEN OVERLAY -->
+    <div id="lock-screen-overlay">
+        <div class="lock-box">
+            <div id="name-panel" class="panel active"><h2>Welcome</h2><input type="text" id="userNameInput" placeholder="Please enter your name"><button id="next-btn" class="btn-primary" style="width: 100%;">Next →</button></div>
+            <div id="password-panel" class="panel"><h2 id="password-heading">Enter Password</h2><input type="password" id="passwordInput" placeholder="Password"><div class="error-message" id="error-message"></div><div class="button-group"><button id="back-btn" class="btn-neutral">← Back</button><button id="login-btn" class="btn-primary">Login</button></div></div>
+            <div id="welcome-panel" class="panel"><div class="welcome-message" id="welcome-message-text"></div></div>
+        </div>
+    </div>
+
+    <!-- MAIN APPLICATION CONTAINER -->
+    <div id="main-app-container">
+        <header class="app-header">
+            <div class="logo-title-container">
+                <img src="logo.png" alt="Academy Logo" class="header-logo" onerror="this.style.display='none'">
+                <h1>Unique Science Academy - Fee Portal</h1>
+            </div>
+            <nav class="app-tabs">
+                <button class="tab-link active" data-tab="voucher-generator">Voucher Generator</button>
+                <button class="tab-link" data-tab="student-database">Student Database</button>
+                <button class="tab-link" data-tab="attendance">Attendance</button> <!-- NEW TAB -->
+                <button class="tab-link" data-tab="notice-generator">Notice Generator</button>
+                <button class="tab-link" data-tab="notes">Notes</button>
+            </nav>
+        </header>
+
+        <main class="app-content">
+            <!-- TAB CONTENT: VOUCHER GENERATOR -->
+            <div id="voucher-generator-tab-content" class="tab-content active">
+                <div class="controls"><h2>Voucher Controls</h2><div class="input-group"><label for="studentName">Student Name</label><input type="text" id="studentName" list="student-names-list" required><datalist id="student-names-list"></datalist></div><div class="input-group"><label for="fatherName">Father Name</label><input type="text" id="fatherName" required></div><div class="input-group"><label for="voucherMonth">Voucher for Month</label><select id="voucherMonth"><option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option></select></div><div class="input-group"><label for="dueDate">Due Date</label><input type="date" id="dueDate"></div><hr style="margin: 20px 0; border-color: var(--light-border-color);"><div class="input-group"><label for="tuitionFee">Tuition Fee (PKR)</label><input type="number" id="tuitionFee" value="5000" min="0" required></div><div class="input-group"><label for="testFee">Test Session Fee (PKR)</label><input type="number" id="testFee" value="0" min="0"></div><div class="input-group"><label for="fine">Fine (PKR)</label><input type="number" id="fine" value="0" min="0"></div><div class="input-group"><label for="otherFees">Other Fees (PKR)</label><input type="number" id="otherFees" value="0" min="0"></div><div class="input-group"><label for="scholarship">Scholarship / Discount (PKR)</label><input type="number" id="scholarship" value="0" min="0"></div><div id="form-validation-error" class="validation-error"></div><div class="actions"><button class="btn-primary" onclick="handlePrintVoucher()">🖨️ Print Voucher</button><button class="btn-secondary" onclick="handleSaveVoucherPdf()">📄 Save as PDF</button></div><div class="theme-switcher"><span>Light</span><label class="switch"><input type="checkbox" id="theme-toggle"><span class="slider"></span></label><span>Dark</span></div></div>
+                <div class="preview-wrapper"><div id="voucher-container" class="preview-container"><div class="preview-header"><img src="logo.png" alt="Academy Logo" onerror="this.style.display='none'"><div class="academy-info"><h1>Unique Science Academy</h1><p>Kot Abdul Malik Campus</p><p>Contact: 0325-3778000</p></div></div><div class="voucher-title">FEE VOUCHER (<span id="voucher-month-display">Month</span> <span id="voucher-year-display">Year</span>)</div><div class="voucher-details"><div class="detail-item student-info"><p>Student Name: <span id="voucher-student-name"></span></p><p>Father Name: <span id="voucher-father-name"></span></p></div><div class="detail-item date-info" style="text-align: right;"><p>Issue Date: <span id="issue-date"></span></p><p>Due Date: <span id="voucher-due-date" style="color: red;"></span></p></div></div><table class="fees-table"><thead><tr><th class="description-col">Fee Description</th><th class="amount-col">Amount (PKR)</th></tr></thead><tbody><tr><td>Tuition Fee</td><td class="amount-col" id="voucher-tuition-fee">0.00</td></tr><tr><td>Test Session Fee</td><td class="amount-col" id="voucher-test-fee">0.00</td></tr><tr><td>Fine</td><td class="amount-col" id="voucher-fine">0.00</td></tr><tr><td>Other Fees</td><td class="amount-col" id="voucher-other-fees">0.00</td></tr><tr class="total-row"><td><strong>Sub Total</strong></td><td class="amount-col" id="voucher-sub-total"><strong>0.00</strong></td></tr><tr><td>Scholarship / Discount</td><td class="amount-col" id="voucher-scholarship">(0.00)</td></tr><tr class="total-row"><td><strong>Total Payable (within Due Date)</strong></td><td class="amount-col" id="voucher-total-payable"><strong>0.00</strong></td></tr></tbody></table><div class="voucher-footer"><div class="footer-notes"><p><strong>Payment Instructions:</strong></p><p>1. Please pay the fee at the designated bank/office counter before the due date.</p><p>2. A late payment surcharge will be applied after the due date.</p><p>3. This is a computer-generated voucher and does not require a signature.</p></div><div class="dev-credit"><p>Software Developed By<br><strong>Abdullah Hashmi</strong></p></div></div></div></div>
+            </div>
+
+            <!-- TAB CONTENT: STUDENT DATABASE -->
+            <div id="student-database-tab-content" class="tab-content">
+                <div class="db-panel">
+                    <div class="db-controls"><input type="search" id="studentSearch" class="search-bar" placeholder="🔍 Search by Name, Roll No, Phone..."><button class="btn-secondary" onclick="showStudentModal()">+ Add New Student</button></div>
+                    <div class="student-table-container">
+                        <table class="student-table">
+                            <thead><tr><th>Roll No</th><th>Student Name</th><th>Father Name</th><th>Date of Birth</th><th>Phone</th><th>Email</th><th>Default Fee</th><th class="actions-col">Actions</th></tr></thead>
+                            <tbody id="student-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT: ATTENDANCE (NEW) -->
+            <div id="attendance-tab-content" class="tab-content">
+                <div class="db-panel">
+                    <div class="attendance-controls">
+                        <div><label for="attendanceDate" style="font-weight: bold;">Select Date for Attendance:</label><input type="date" id="attendanceDate"></div>
+                        <div><button class="btn-primary" onclick="handleSaveAttendance()">💾 Save Today's Attendance</button><span id="save-attendance-status"></span></div>
+                    </div>
+                    <div class="attendance-table-container">
+                        <table class="attendance-table">
+                            <thead><tr><th>Roll No</th><th>Student Name</th><th>Status</th><th class="actions-col">Details</th></tr></thead>
+                            <tbody id="attendance-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT: NOTICE GENERATOR -->
+            <div id="notice-generator-tab-content" class="tab-content">
+                <div class="controls"><h2>Notice Controls</h2><div class="input-group"><label for="notice-heading">Main Heading</label><input type="text" id="notice-heading" placeholder="e.g., Important Announcement" required></div><div class="input-group"><label for="notice-body">Body Text</label><textarea id="notice-body" placeholder="Enter the main content of the notice here..." required></textarea></div><div class="input-group"><label for="notice-regards">Regards / From</label><input type="text" id="notice-regards" placeholder="e.g., Academy Management" required></div><div id="notice-validation-error" class="validation-error"></div><div class="actions"><button class="btn-primary" onclick="handlePrintNotice()">🖨️ Print Notice</button><button class="btn-secondary" onclick="handleSaveNoticePdf()">📄 Save as PDF</button><button class="btn-neutral" onclick="clearNoticeForm()">✨ Clear Form</button></div></div>
+                <div class="preview-wrapper"><div id="notice-preview-container" class="preview-container"><div class="preview-header"><img src="logo.png" alt="Academy Logo" onerror="this.style.display='none'"><div class="academy-info"><h1>Unique Science Academy</h1><p>Kot Abdul Malik Campus</p><p>Contact: 0325-3778000</p></div></div><div class="notice-header-info"><p>Ref: USA/Notice/_______</p><p>Date: <span id="notice-date-preview"></span></p></div><h2 id="notice-heading-preview">Main Heading</h2><p id="notice-body-preview">This is the body of the notice. All the text you write in the 'Body Text' field on the left will appear here in real-time. This allows you to see exactly how the final notice will look before printing.</p><p id="notice-regards-preview">Regards,<br>Academy Management</p></div></div>
+            </div>
+
+            <!-- TAB CONTENT: NOTES -->
+            <div id="notes-tab-content" class="tab-content">
+                <div class="notes-app-container"><div class="notes-sidebar"><div class="notes-sidebar-header"><button id="new-note-btn" class="btn-secondary">＋ New Note</button></div><ul id="notes-list"></ul></div><div class="notes-editor"><div id="editor-placeholder"><span class="placeholder-icon">📝</span><h2>No Note Selected</h2><p>Select a note from the left panel to view or edit, or create a new one.</p></div><div id="editor-main"><input type="text" id="note-title-input" placeholder="Note Title..."><div id="note-content-editor"></div><div class="editor-actions"><div><button id="save-note-btn" class="btn-primary">Save Changes</button><span id="save-note-status"></span></div><button id="delete-note-btn" class="btn-danger">Delete This Note</button></div></div></div></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- STUDENT ADD/EDIT MODAL -->
+    <div id="student-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;"><div class="modal-header"><h2 id="modal-title">Add New Student</h2><button class="close-btn" onclick="hideStudentModal()">×</button></div><form id="student-form" onsubmit="handleStudentFormSubmit(event)"><input type="hidden" id="studentId"><div class="modal-body"><div class="input-group"><label for="rollNo">Roll Number</label><input type="text" id="rollNo" required></div><div class="input-group"><label for="modalStudentName">Student Name</label><input type="text" id="modalStudentName" required></div><div class="input-group"><label for="modalFatherName">Father's Name</label><input type="text" id="modalFatherName" required></div><div class="input-group"><label for="dob">Date of Birth</label><input type="date" id="dob" required></div><div class="input-group"><label for="phone">Phone Number *</label><input type="tel" id="phone" placeholder="e.g., 03001234567" required></div><div class="input-group"><label for="email">Email</label><input type="email" id="email" placeholder="(Optional)"></div><div class="input-group"><label for="defaultFee">Default Fee (PKR)</label><input type="number" id="defaultFee" min="0" required></div></div><div id="modal-validation-error" class="validation-error"></div><div class="modal-footer"><button type="button" class="btn-neutral" onclick="hideStudentModal()">Cancel</button><button type="submit" class="btn-primary">Save Student</button></div></form></div>
+    </div>
+
+    <!-- ATTENDANCE DETAIL MODAL (NEW) -->
+    <div id="attendance-detail-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-student-name-display">Student Attendance Details</h2>
+                <button class="close-btn" onclick="hideAttendanceDetailModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="attendance-summary">
+                    <h4>This Month (<span id="summary-month-name"></span>)</h4>
+                    <p>Present: <span id="month-present-days">0</span> days</p>
+                    <p>Absent: <span id="month-absent-days">0</span> days</p>
+                    <p>Leave: <span id="month-leave-days">0</span> days</p>
+                    <hr style="margin: 15px 0;">
+                    <h4>All Time</h4>
+                    <p>Present: <span id="total-present-days">0</span> days</p>
+                    <p>Absent: <span id="total-absent-days">0</span> days</p>
+                    <p>Leave: <span id="total-leave-days">0</span> days</p>
+                </div>
+                <div id="calendar-container">
+                    <div class="calendar-header">
+                        <button class="btn-neutral btn-small" id="prev-month-btn">◀ Prev</button>
+                        <h3 id="calendar-month-year">Month Year</h3>
+                        <button class="btn-neutral btn-small" id="next-month-btn">Next ▶</button>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="day-header">S</div><div class="day-header">M</div><div class="day-header">T</div><div class="day-header">W</div><div class="day-header">T</div><div class="day-header">F</div><div class="day-header">S</div>
+                    </div>
+                    <div id="calendar-body" class="calendar-grid">
+                        <!-- Calendar days will be generated here by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+    window.jsPDF = window.jspdf.jsPDF;
+    const DB_KEY = 'uniqueScienceAcademyStudents';
+    const NOTES_DB_KEY = 'uniqueScienceAcademyMultiNotes';
+    const ATTENDANCE_DB_KEY = 'uniqueScienceAcademyAttendance'; // NEW KEY FOR ATTENDANCE
+    let activeNoteId = null;
+    let calendarDate = new Date(); // For attendance calendar modal
+
+    // --- UTILITY: Get date as YYYY-MM-DD string ---
+    function toYYYYMMDD(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    // --- DATABASE (localStorage) LOGIC (Student, Notes, Attendance) ---
+    const StudentDB = {
+        getStudents: () => JSON.parse(localStorage.getItem(DB_KEY)) || [],
+        saveStudents: (students) => { localStorage.setItem(DB_KEY, JSON.stringify(students)); populateStudentDatalist(); },
+        addStudent: (student) => { const students = StudentDB.getStudents(); students.push(student); StudentDB.saveStudents(students); },
+        updateStudent: (updatedStudent) => { let students = StudentDB.getStudents(); students = students.map(student => student.id === updatedStudent.id ? updatedStudent : student); StudentDB.saveStudents(students); },
+        deleteStudent: (studentId) => { let students = StudentDB.getStudents(); students = students.filter(student => student.id !== studentId); StudentDB.saveStudents(students); },
+        findById: (studentId) => StudentDB.getStudents().find(student => student.id === studentId)
+    };
+    
+    const NotesDB = {
+        getNotes: () => JSON.parse(localStorage.getItem(NOTES_DB_KEY)) || [],
+        saveNotes: (notes) => localStorage.setItem(NOTES_DB_KEY, JSON.stringify(notes)),
+        getNoteById: (noteId) => NotesDB.getNotes().find(note => note.id === noteId),
+    };
+
+    const AttendanceDB = {
+        getAttendance: () => JSON.parse(localStorage.getItem(ATTENDANCE_DB_KEY)) || {},
+        saveAttendance: (data) => localStorage.setItem(ATTENDANCE_DB_KEY, JSON.stringify(data)),
+        markAttendance: function(studentId, dateString, status) {
+            const allAttendance = this.getAttendance();
+            if (!allAttendance[studentId]) {
+                allAttendance[studentId] = {};
+            }
+            allAttendance[studentId][dateString] = status;
+            this.saveAttendance(allAttendance);
+        },
+        getStudentAttendance: function(studentId) {
+            return this.getAttendance()[studentId] || {};
+        }
+    };
+
+    // --- STUDENT DATABASE UI & MODAL LOGIC ---
+    function renderStudentTable(searchTerm = '') {
+        const tableBody = document.getElementById('student-table-body');
+        const students = StudentDB.getStudents();
+        tableBody.innerHTML = '';
+        const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.rollNo.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm));
+        if (filteredStudents.length === 0) { tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;">No students found.</td></tr>`; return; }
+        filteredStudents.forEach(student => { tableBody.innerHTML += `<tr><td>${student.rollNo}</td><td>${student.name}</td><td>${student.fatherName}</td><td>${new Date(student.dob).toLocaleDateString('en-GB')}</td><td>${student.phone}</td><td>${student.email || 'N/A'}</td><td>${parseFloat(student.defaultFee).toFixed(2)}</td><td class="actions-col"><button class="btn-accent btn-small" onclick="showStudentModal('${student.id}')">Edit</button><button class="btn-danger btn-small" onclick="deleteStudentHandler('${student.id}')">Delete</button></td></tr>`; });
+    }
+
+    function showStudentModal(studentId = null) {
+        document.getElementById('student-form').reset();
+        document.getElementById('modal-validation-error').style.display = 'none';
+        const modal = document.getElementById('student-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const studentIdField = document.getElementById('studentId');
+        if (studentId) {
+            modalTitle.innerText = 'Edit Student Details';
+            const student = StudentDB.findById(studentId);
+            studentIdField.value = student.id;
+            document.getElementById('rollNo').value = student.rollNo;
+            document.getElementById('modalStudentName').value = student.name;
+            document.getElementById('modalFatherName').value = student.fatherName;
+            document.getElementById('dob').value = student.dob;
+            document.getElementById('phone').value = student.phone;
+            document.getElementById('email').value = student.email;
+            document.getElementById('defaultFee').value = student.defaultFee;
+        } else {
+            modalTitle.innerText = 'Add New Student';
+            studentIdField.value = '';
+        }
+        modal.style.display = 'flex';
+    }
+
+    function hideStudentModal() { document.getElementById('student-modal').style.display = 'none'; }
+    
+    function handleStudentFormSubmit(event) {
+        event.preventDefault();
+        const errorDiv = document.getElementById('modal-validation-error');
+        errorDiv.style.display = 'none';
+        const phone = document.getElementById('phone').value.trim();
+        if (!phone) { errorDiv.innerText = 'Phone number is a mandatory field.'; errorDiv.style.display = 'block'; return; }
+        const student = { id: document.getElementById('studentId').value || `student_${Date.now()}`, rollNo: document.getElementById('rollNo').value.trim(), name: document.getElementById('modalStudentName').value.trim(), fatherName: document.getElementById('modalFatherName').value.trim(), dob: document.getElementById('dob').value, phone: phone, email: document.getElementById('email').value.trim(), defaultFee: document.getElementById('defaultFee').value };
+        if (document.getElementById('studentId').value) { StudentDB.updateStudent(student); } else { StudentDB.addStudent(student); }
+        hideStudentModal();
+        renderStudentTable();
+        renderAttendanceSheet(); // Refresh attendance sheet if a new student is added/updated
+    }
+    
+    function deleteStudentHandler(studentId) {
+        const student = StudentDB.findById(studentId);
+        if (confirm(`Are you sure you want to delete the record for ${student.name}? This will NOT delete their attendance history.`)) { 
+            StudentDB.deleteStudent(studentId); 
+            renderStudentTable();
+            renderAttendanceSheet(); // Refresh attendance sheet
+        }
+    }
+
+    // --- LOCK SCREEN LOGIC ---
+    function initializeLockScreen() {
+        const overlay = document.getElementById('lock-screen-overlay'), mainApp = document.getElementById('main-app-container'), namePanel = document.getElementById('name-panel'), passwordPanel = document.getElementById('password-panel'), welcomePanel = document.getElementById('welcome-panel'), userNameInput = document.getElementById('userNameInput'), passwordInput = document.getElementById('passwordInput'), nextBtn = document.getElementById('next-btn'), backBtn = document.getElementById('back-btn'), loginBtn = document.getElementById('login-btn'), errorMessage = document.getElementById('error-message');
+        let userName = '';
+        nextBtn.addEventListener('click', () => { userName = userNameInput.value.trim(); if (userName) { document.getElementById('password-heading').innerText = `Enter Password, ${userName}`; namePanel.classList.remove('active'); passwordPanel.classList.add('active'); passwordInput.focus(); } });
+        backBtn.addEventListener('click', () => { passwordPanel.classList.remove('active'); namePanel.classList.add('active'); errorMessage.innerText = ''; passwordInput.value = ''; userNameInput.focus(); });
+        loginBtn.addEventListener('click', () => { if (passwordInput.value === '8585385') { errorMessage.innerText = ''; passwordPanel.classList.remove('active'); welcomePanel.classList.add('active'); document.getElementById('welcome-message-text').innerText = `Welcome Back, ${userName}!`; setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; mainApp.style.display = 'flex'; initializeApp(); }, 500); }, 1500); } else { errorMessage.innerText = 'Incorrect password. Please try again.'; passwordInput.value = ''; } });
+        [userNameInput, passwordInput].forEach(el => el.addEventListener('keyup', e => { if(e.key === 'Enter') el === userNameInput ? nextBtn.click() : loginBtn.click(); }));
+    }
+
+    // --- VOUCHER LOGIC (VALIDATION, PRINT, SAVE, DB INTEGRATION) ---
+    function validateVoucherForm() {
+        const studentName = document.getElementById('studentName'), fatherName = document.getElementById('fatherName'), tuitionFee = document.getElementById('tuitionFee'), errorDiv = document.getElementById('form-validation-error');
+        let isValid = true;
+        [studentName, fatherName, tuitionFee].forEach(el => el.classList.remove('mandatory-error'));
+        errorDiv.style.display = 'none';
+        if (!studentName.value.trim()) { studentName.classList.add('mandatory-error'); isValid = false; }
+        if (!fatherName.value.trim()) { fatherName.classList.add('mandatory-error'); isValid = false; }
+        if (!tuitionFee.value.trim() || parseFloat(tuitionFee.value) <= 0) { tuitionFee.classList.add('mandatory-error'); isValid = false; }
+        if (!isValid) { errorDiv.innerText = 'Please fill all mandatory fields (Student Name, Father Name, Tuition Fee).'; errorDiv.style.display = 'block'; }
+        return isValid;
+    }
+    function handlePrintVoucher() { if (validateVoucherForm()) { document.body.classList.add('printing-voucher'); window.print(); document.body.classList.remove('printing-voucher'); } }
+    function handleSaveVoucherPdf() { if (validateVoucherForm()) saveAsPdf('voucher-container', `Fee_Voucher_${document.getElementById('studentName').value.replace(/\s/g, '_')}_${document.getElementById('voucherMonth').value}.pdf`); }
+    function populateStudentDatalist() {
+        const datalist = document.getElementById('student-names-list'), students = StudentDB.getStudents();
+        datalist.innerHTML = '';
+        students.forEach(student => { datalist.innerHTML += `<option value="${student.name}">`; });
+    }
+    function autoFillVoucherForm(event) {
+        const student = StudentDB.getStudents().find(s => s.name === event.target.value);
+        if (student) { document.getElementById('fatherName').value = student.fatherName; document.getElementById('tuitionFee').value = student.defaultFee; updateVoucher(); }
+    }
+    function updateVoucher() {
+        const tuitionFee = parseFloat(document.getElementById('tuitionFee').value) || 0, testFee = parseFloat(document.getElementById('testFee').value) || 0, fine = parseFloat(document.getElementById('fine').value) || 0, otherFees = parseFloat(document.getElementById('otherFees').value) || 0, scholarship = parseFloat(document.getElementById('scholarship').value) || 0, subTotal = tuitionFee + testFee + fine + otherFees, totalPayable = subTotal - scholarship, today = new Date();
+        document.getElementById('voucher-student-name').innerText = document.getElementById('studentName').value || '_________________';
+        document.getElementById('voucher-father-name').innerText = document.getElementById('fatherName').value || '_________________';
+        document.getElementById('voucher-month-display').innerText = document.getElementById('voucherMonth').value;
+        document.getElementById('voucher-year-display').innerText = today.getFullYear();
+        document.getElementById('issue-date').innerText = today.toLocaleDateString('en-GB');
+        document.getElementById('voucher-due-date').innerText = document.getElementById('dueDate').value ? new Date(document.getElementById('dueDate').value).toLocaleDateString('en-GB') : 'N/A';
+        document.getElementById('voucher-tuition-fee').innerText = tuitionFee.toFixed(2);
+        document.getElementById('voucher-test-fee').innerText = testFee.toFixed(2);
+        document.getElementById('voucher-fine').innerText = fine.toFixed(2);
+        document.getElementById('voucher-other-fees').innerText = otherFees.toFixed(2);
+        document.getElementById('voucher-sub-total').innerText = subTotal.toFixed(2);
+        document.getElementById('voucher-scholarship').innerText = `(${scholarship.toFixed(2)})`;
+        document.getElementById('voucher-total-payable').innerText = totalPayable.toFixed(2);
+    }
+    
+    // --- NOTICE GENERATOR LOGIC ---
+    function validateNoticeForm() {
+        const heading = document.getElementById('notice-heading'), body = document.getElementById('notice-body'), regards = document.getElementById('notice-regards'), errorDiv = document.getElementById('notice-validation-error');
+        let isValid = true;
+        [heading, body, regards].forEach(el => el.classList.remove('mandatory-error'));
+        errorDiv.style.display = 'none';
+        if (!heading.value.trim()) { heading.classList.add('mandatory-error'); isValid = false; }
+        if (!body.value.trim()) { body.classList.add('mandatory-error'); isValid = false; }
+        if (!regards.value.trim()) { regards.classList.add('mandatory-error'); isValid = false; }
+        if (!isValid) { errorDiv.innerText = 'Please fill all fields to generate the notice.'; errorDiv.style.display = 'block'; }
+        return isValid;
+    }
+    function updateNoticePreview() {
+        document.getElementById('notice-date-preview').innerText = new Date().toLocaleDateString('en-GB');
+        document.getElementById('notice-heading-preview').innerText = document.getElementById('notice-heading').value || 'Main Heading';
+        document.getElementById('notice-body-preview').innerText = document.getElementById('notice-body').value || 'Notice body content will appear here...';
+        document.getElementById('notice-regards-preview').innerHTML = "Regards,<br>" + (document.getElementById('notice-regards').value || 'Academy Management');
+    }
+    function clearNoticeForm() {
+        ['notice-heading', 'notice-body', 'notice-regards'].forEach(id => { document.getElementById(id).value = ''; document.getElementById(id).classList.remove('mandatory-error'); });
+        document.getElementById('notice-validation-error').style.display = 'none';
+        updateNoticePreview();
+    }
+    function handlePrintNotice() { if (validateNoticeForm()) { document.body.classList.add('printing-notice'); window.print(); document.body.classList.remove('printing-notice'); } }
+    function handleSaveNoticePdf() { if (validateNoticeForm()) saveAsPdf('notice-preview-container', `Notice_${document.getElementById('notice-heading').value.replace(/\s/g, '_') || 'General'}.pdf`); }
+    
+    // --- NOTES TAB LOGIC (No changes here) ---
+    function renderNotesList() {
+        const notes = NotesDB.getNotes().sort((a, b) => b.lastModified - a.lastModified);
+        const listEl = document.getElementById('notes-list');
+        listEl.innerHTML = notes.length === 0 ? `<li style="padding: 20px; text-align: center; color: #888;">No notes yet.</li>` : '';
+        notes.forEach(note => {
+            const item = document.createElement('li');
+            item.className = `note-list-item ${note.id === activeNoteId ? 'active' : ''}`;
+            item.dataset.noteId = note.id;
+            item.innerHTML = `<span class="note-list-title">${note.title || 'Untitled'}</span>`;
+            item.addEventListener('click', () => handleNoteSelection(note.id));
+            listEl.appendChild(item);
+        });
+    }
+    function handleNoteSelection(noteId) {
+        activeNoteId = noteId; const note = NotesDB.getNoteById(noteId);
+        if (!note) return;
+        document.getElementById('editor-placeholder').style.display = 'none';
+        document.getElementById('editor-main').style.display = 'flex';
+        document.getElementById('note-title-input').value = note.title;
+        document.getElementById('note-content-editor').innerHTML = `<textarea placeholder="Write your note here...">${note.content || ''}</textarea>`;
+        renderNotesList();
+    }
+    function showEditorPlaceholder() {
+        activeNoteId = null;
+        document.getElementById('editor-placeholder').style.display = 'flex';
+        document.getElementById('editor-main').style.display = 'none';
+        renderNotesList();
+    }
+    function handleSaveNote() {
+        if (!activeNoteId) return;
+        let notes = NotesDB.getNotes();
+        const noteIndex = notes.findIndex(note => note.id === activeNoteId);
+        if (noteIndex === -1) return;
+        notes[noteIndex].title = document.getElementById('note-title-input').value.trim();
+        notes[noteIndex].content = document.querySelector('#note-content-editor textarea').value;
+        notes[noteIndex].lastModified = Date.now();
+        NotesDB.saveNotes(notes);
+        renderNotesList();
+        const statusEl = document.getElementById('save-note-status');
+        statusEl.innerText = '✔ Saved!'; statusEl.style.opacity = '1';
+        setTimeout(() => { statusEl.style.opacity = '0'; }, 2000);
+    }
+    function handleNewNote() {
+        const newNote = { id: `note_${Date.now()}`, title: 'Untitled Note', content: '', createdDate: Date.now(), lastModified: Date.now() };
+        const notes = NotesDB.getNotes();
+        notes.push(newNote);
+        NotesDB.saveNotes(notes);
+        handleNoteSelection(newNote.id);
+    }
+    function handleDeleteNote() {
+        if (!activeNoteId || !confirm("Are you sure you want to delete this note permanently?")) return;
+        let notes = NotesDB.getNotes().filter(note => note.id !== activeNoteId);
+        NotesDB.saveNotes(notes);
+        showEditorPlaceholder();
+    }
+    function initializeNotesApp() {
+        showEditorPlaceholder();
+        document.getElementById('new-note-btn').addEventListener('click', handleNewNote);
+        document.getElementById('save-note-btn').addEventListener('click', handleSaveNote);
+        document.getElementById('delete-note-btn').addEventListener('click', handleDeleteNote);
+    }
+    
+    // --- ATTENDANCE TAB LOGIC (NEW) ---
+    function initializeAttendanceTab() {
+        const datePicker = document.getElementById('attendanceDate');
+        datePicker.value = toYYYYMMDD(new Date()); // Set to today
+        datePicker.addEventListener('change', () => renderAttendanceSheet());
+        renderAttendanceSheet();
+    }
+
+    function renderAttendanceSheet() {
+        const dateString = document.getElementById('attendanceDate').value;
+        const tableBody = document.getElementById('attendance-table-body');
+        const students = StudentDB.getStudents();
+        const attendanceData = AttendanceDB.getAttendance();
+        tableBody.innerHTML = '';
+
+        if (students.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px;">No students in database. Add students first.</td></tr>`;
+            return;
+        }
+
+        students.forEach(student => {
+            const studentAttendance = attendanceData[student.id] ? attendanceData[student.id][dateString] : null;
+            const row = `
+                <tr>
+                    <td>${student.rollNo}</td>
+                    <td>${student.name}</td>
+                    <td>
+                        <div class="attendance-status-group">
+                            <input type="radio" id="att-${student.id}-P" name="att-${student.id}" value="P" ${studentAttendance === 'P' ? 'checked' : ''}>
+                            <label for="att-${student.id}-P">Present</label>
+                            
+                            <input type="radio" id="att-${student.id}-A" name="att-${student.id}" value="A" ${studentAttendance === 'A' ? 'checked' : ''}>
+                            <label for="att-${student.id}-A">Absent</label>
+
+                            <input type="radio" id="att-${student.id}-L" name="att-${student.id}" value="L" ${studentAttendance === 'L' ? 'checked' : ''}>
+                            <label for="att-${student.id}-L">Leave</label>
+                        </div>
+                    </td>
+                    <td class="actions-col">
+                        <button class="btn-secondary btn-small" onclick="showAttendanceDetailModal('${student.id}')">View Details</button>
+                    </td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function handleSaveAttendance() {
+        const dateString = document.getElementById('attendanceDate').value;
+        const checkedRadios = document.querySelectorAll('.attendance-status-group input[type="radio"]:checked');
+        
+        checkedRadios.forEach(radio => {
+            const studentId = radio.name.replace('att-', '');
+            const status = radio.value;
+            AttendanceDB.markAttendance(studentId, dateString, status);
+        });
+
+        const statusEl = document.getElementById('save-attendance-status');
+        statusEl.innerText = '✔ Attendance Saved!';
+        statusEl.style.opacity = '1';
+        setTimeout(() => { statusEl.style.opacity = '0'; }, 2500);
+    }
+    
+    // --- ATTENDANCE DETAIL MODAL & CALENDAR LOGIC (NEW) ---
+    function showAttendanceDetailModal(studentId) {
+        calendarDate = new Date(); // Reset to current month on open
+        const student = StudentDB.findById(studentId);
+        if (!student) { alert('Student not found!'); return; }
+        
+        document.getElementById('modal-student-name-display').innerText = `${student.name}'s Attendance`;
+        
+        const modal = document.getElementById('attendance-detail-modal');
+        modal.dataset.currentStudentId = studentId; // Store studentId on the modal
+        
+        renderCalendar(studentId, calendarDate.getFullYear(), calendarDate.getMonth());
+
+        modal.style.display = 'flex';
+    }
+
+    function hideAttendanceDetailModal() {
+        document.getElementById('attendance-detail-modal').style.display = 'none';
+    }
+    
+    function renderCalendar(studentId, year, month) {
+        const studentAttendance = AttendanceDB.getStudentAttendance(studentId);
+        const calendarBody = document.getElementById('calendar-body');
+        const monthYearLabel = document.getElementById('calendar-month-year');
+        
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        monthYearLabel.innerText = `${new Date(year, month).toLocaleString('default', { month: 'long' })} ${year}`;
+        calendarBody.innerHTML = '';
+        
+        // Blank days for padding
+        for (let i = 0; i < firstDay; i++) {
+            calendarBody.innerHTML += `<div class="calendar-day other-month"></div>`;
+        }
+        
+        // Fill days of the month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const currentDate = new Date(year, month, day);
+            const dateString = toYYYYMMDD(currentDate);
+            const todayString = toYYYYMMDD(new Date());
+            
+            let classes = 'calendar-day';
+            if (dateString === todayString) classes += ' today';
+            
+            const status = studentAttendance[dateString];
+            if (status === 'P') classes += ' present';
+            else if (status === 'A') classes += ' absent';
+            else if (status === 'L') classes += ' leave';
+
+            calendarBody.innerHTML += `<div class="${classes}">${day}</div>`;
+        }
+
+        calculateAndDisplayStats(studentId, year, month);
+    }
+
+    function calculateAndDisplayStats(studentId, year, month) {
+        const studentAttendance = AttendanceDB.getStudentAttendance(studentId);
+        let monthPresent = 0, monthAbsent = 0, monthLeave = 0;
+        let totalPresent = 0, totalAbsent = 0, totalLeave = 0;
+
+        for (const dateString in studentAttendance) {
+            const status = studentAttendance[dateString];
+            if (status === 'P') totalPresent++;
+            else if (status === 'A') totalAbsent++;
+            else if (status === 'L') totalLeave++;
+            
+            const recordDate = new Date(dateString);
+            if(recordDate.getFullYear() === year && recordDate.getMonth() === month) {
+                if (status === 'P') monthPresent++;
+                else if (status === 'A') monthAbsent++;
+                else if (status === 'L') monthLeave++;
+            }
+        }
+        
+        document.getElementById('summary-month-name').innerText = new Date(year, month).toLocaleString('default', { month: 'long' });
+        document.getElementById('month-present-days').innerText = monthPresent;
+        document.getElementById('month-absent-days').innerText = monthAbsent;
+        document.getElementById('month-leave-days').innerText = monthLeave;
+        document.getElementById('total-present-days').innerText = totalPresent;
+        document.getElementById('total-absent-days').innerText = totalAbsent;
+        document.getElementById('total-leave-days').innerText = totalLeave;
+    }
+
+    // --- GENERIC PDF SAVER ---
+    function saveAsPdf(elementId, filename) {
+        const element = document.getElementById(elementId);
+        html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const margin = 10, pdfWidth = pdf.internal.pageSize.getWidth() - margin * 2, pdfHeight = pdf.internal.pageSize.getHeight() - margin * 2, ratio = canvas.width / canvas.height;
+            let imgWidth = pdfWidth, imgHeight = imgWidth / ratio;
+            if (imgHeight > pdfHeight) { imgHeight = pdfHeight; imgWidth = imgHeight * ratio; }
+            pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+            pdf.save(filename);
+        });
+    }
+
+    // --- THEME & TAB SWITCHER ---
+    function initializeTheme() {
+        const themeToggle = document.getElementById('theme-toggle');
+        if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-mode'); themeToggle.checked = true; }
+        themeToggle.addEventListener('change', () => { document.body.classList.toggle('dark-mode'); localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); });
+    }
+    function initializeTabs() {
+        document.querySelectorAll('.tab-link[data-tab]').forEach(link => {
+            link.addEventListener('click', () => {
+                document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                link.classList.add('active');
+                document.getElementById(`${link.dataset.tab}-tab-content`).classList.add('active');
+            });
+        });
+    }
+
+    // --- INITIALIZATION ---
+    function initializeApp() {
+        // Render DBs
+        renderStudentTable();
+        populateStudentDatalist();
+        
+        // Initialize Tabs
+        initializeNotesApp();
+        initializeAttendanceTab();
+
+        // Forms setup
+        const today = new Date();
+        document.getElementById('voucherMonth').selectedIndex = today.getMonth();
+        const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 10);
+        document.getElementById('dueDate').value = toYYYYMMDD(nextMonth);
+        updateVoucher();
+        updateNoticePreview();
+        
+        // Event Listeners
+        document.querySelectorAll('#voucher-generator-tab-content .controls input, #voucher-generator-tab-content .controls select').forEach(input => input.addEventListener('input', updateVoucher));
+        document.querySelectorAll('#notice-generator-tab-content .controls input, #notice-generator-tab-content .controls textarea').forEach(el => el.addEventListener('input', updateNoticePreview));
+        document.getElementById('studentSearch').addEventListener('input', (e) => renderStudentTable(e.target.value));
+        document.getElementById('studentName').addEventListener('input', autoFillVoucherForm);
+        
+        // Calendar navigation
+        document.getElementById('prev-month-btn').addEventListener('click', () => {
+            calendarDate.setMonth(calendarDate.getMonth() - 1);
+            const studentId = document.getElementById('attendance-detail-modal').dataset.currentStudentId;
+            renderCalendar(studentId, calendarDate.getFullYear(), calendarDate.getMonth());
+        });
+        document.getElementById('next-month-btn').addEventListener('click', () => {
+            calendarDate.setMonth(calendarDate.getMonth() + 1);
+            const studentId = document.getElementById('attendance-detail-modal').dataset.currentStudentId;
+            renderCalendar(studentId, calendarDate.getFullYear(), calendarDate.getMonth());
+        });
+    }
+
+    window.onload = () => {
+        initializeLockScreen();
+        initializeTheme();
+        initializeTabs();
+        // initializeApp() is now called after successful login.
+    };
+</script>
+</body>
+</html>
